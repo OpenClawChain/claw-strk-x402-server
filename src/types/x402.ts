@@ -227,24 +227,24 @@ export interface FacilitatorConfig {
 export interface PaymentMiddlewareConfig {
   /** Facilitator server URL */
   facilitatorUrl: string;
-  
+
   /** Address to receive payments */
   payToAddress: string;
-  
+
   /** Token contract address */
   tokenAddress: string;
-  
+
   /** Network identifier */
   network: string;
-  
+
   /** Endpoint pricing map */
   pricing: Record<string, string>;
-  
-  /** Optional timeout in seconds */
-  timeoutSeconds?: number;
-  
-  /** Optional scheme (defaults to 'exact') */
-  scheme?: string;
+
+  /** Timeout in seconds */
+  timeoutSeconds: number;
+
+  /** Payment scheme (defaults to 'exact') */
+  scheme: string;
 }
 
 // ============================================================================

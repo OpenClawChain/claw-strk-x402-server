@@ -147,14 +147,17 @@ export class StarknetSettler {
       try {
         const receipt = await this.provider.getTransactionReceipt(txHash);
 
-        if (receipt && receipt.execution_status === 'SUCCEEDED') {
+        const execStatus = (receipt as any)?.execution_status;
+
+        if (receipt && execStatus === 'SUCCEEDED') {
           console.log(`Transaction ${txHash} confirmed`);
           return;
         }
 
-        if (receipt && receipt.execution_status === 'REVERTED') {
+        if (receipt && execStatus === 'REVERTED') {
+          const revertReason = (receipt as any)?.revert_reason;
           throw new SettlementError(
-            `Transaction reverted: ${receipt.revert_reason || 'Unknown reason'}`
+            `Transaction reverted: ${revertReason || 'Unknown reason'}`
           );
         }
 

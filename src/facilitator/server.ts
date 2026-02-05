@@ -123,7 +123,8 @@ export class FacilitatorServer {
           isValid: false,
           invalidReason: 'Invalid request format',
         };
-        return res.json(response);
+        res.json(response);
+        return;
       }
 
       // Decode payment header
@@ -134,7 +135,8 @@ export class FacilitatorServer {
           isValid: false,
           invalidReason: 'Invalid payment header encoding',
         };
-        return res.json(response);
+        res.json(response);
+        return;
       }
 
       // Verify version match
@@ -143,7 +145,8 @@ export class FacilitatorServer {
           isValid: false,
           invalidReason: 'Version mismatch',
         };
-        return res.json(response);
+        res.json(response);
+        return;
       }
 
       // Verify the payment based on scheme and network
@@ -179,7 +182,8 @@ export class FacilitatorServer {
           txHash: null,
           networkId: null,
         };
-        return res.json(response);
+        res.json(response);
+        return;
       }
 
       // Decode payment header
@@ -192,7 +196,8 @@ export class FacilitatorServer {
           txHash: null,
           networkId: null,
         };
-        return res.json(response);
+        res.json(response);
+        return;
       }
 
       // First verify the payment
@@ -208,7 +213,8 @@ export class FacilitatorServer {
           txHash: null,
           networkId: null,
         };
-        return res.json(response);
+        res.json(response);
+        return;
       }
 
       // Settle the payment on-chain

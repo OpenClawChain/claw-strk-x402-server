@@ -169,8 +169,8 @@ export class StarknetVerifier {
       }
 
       // Verify the signature using Starknet's EC signature verification
-      const signature = [payload.signature.r, payload.signature.s];
-      
+      const signature = [payload.signature.r, payload.signature.s] as any;
+
       // Use starknet.js to verify the signature
       const isValid = ec.starkCurve.verify(
         signature,
