@@ -234,6 +234,9 @@ export interface PaymentMiddlewareConfig {
   /** Token contract address */
   tokenAddress: string;
 
+  /** Token decimals for pricing conversion (atomic units) */
+  tokenDecimals: number;
+
   /** Network identifier */
   network: string;
 

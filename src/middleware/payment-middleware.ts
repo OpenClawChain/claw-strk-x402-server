@@ -39,7 +39,10 @@ export function paymentMiddleware(
   const config: PaymentMiddlewareConfig = {
     facilitatorUrl: options?.facilitatorUrl || 'http://localhost:3001',
     payToAddress,
-    tokenAddress: options?.tokenAddress || '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7', // ETH on Starknet
+    tokenAddress:
+      options?.tokenAddress ||
+      '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7', // ETH on Starknet
+    tokenDecimals: options?.tokenDecimals ?? 18,
     network: options?.network || 'starknet-sepolia',
     pricing,
     timeoutSeconds: options?.timeoutSeconds || 300, // 5 minutes default
@@ -149,12 +152,12 @@ function sendPaymentRequired(
   config: PaymentMiddlewareConfig,
   error?: string
 ): void {
-  const amountInWei = parsePrice(price);
+  const amountAtomic = parseTokenPrice(price, config.tokenDecimals);
 
   const requirements: PaymentRequirements = {
     scheme: config.scheme,
     network: config.network,
-    maxAmountRequired: amountInWei.toString(),
+    maxAmountRequired: amountAtomic.toString(),
     resource,
     description: `Access to ${resource}`,
     mimeType: 'application/json',
@@ -175,25 +178,23 @@ function sendPaymentRequired(
 }
 
 /**
- * Parses a price string like "$0.01" into wei
+ * Parses a price string like "$0.001" into atomic units for the configured token.
+ *
+ * If you want USD-denominated pricing, add an oracle layer separately.
  */
-function parsePrice(price: string): bigint {
-  // Remove currency symbols and whitespace
+function parseTokenPrice(price: string, decimals: number): bigint {
   const cleaned = price.replace(/[$\s]/g, '');
-  
-  // Parse as decimal
-  const dollars = parseFloat(cleaned);
-  
-  if (isNaN(dollars)) {
+  if (!cleaned) throw new Error(`Invalid price format: ${price}`);
+
+  const [whole = '0', frac = ''] = cleaned.split('.');
+  if (!/^[0-9]+$/.test(whole) || (frac && !/^[0-9]+$/.test(frac))) {
     throw new Error(`Invalid price format: ${price}`);
   }
 
-  // Convert to wei (assuming 1 ETH = $2000, adjust as needed)
-  // In production, you'd use an oracle or fixed conversion rate
-  const ethAmount = dollars / 2000;
-  const weiAmount = BigInt(Math.floor(ethAmount * 1e18));
-  
-  return weiAmount;
+  const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+  const units = BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fracPadded || '0');
+  if (units <= 0n) throw new Error(`Price must be > 0: ${price}`);
+  return units;
 }
 
 /**
@@ -206,12 +207,12 @@ async function verifyAndSettlePayment(
   config: PaymentMiddlewareConfig
 ): Promise<{ success: boolean; error?: string; txHash?: string }> {
   try {
-    const amountInWei = parsePrice(price);
+    const amountAtomic = parseTokenPrice(price, config.tokenDecimals);
 
     const requirements: PaymentRequirements = {
       scheme: config.scheme,
       network: config.network,
-      maxAmountRequired: amountInWei.toString(),
+      maxAmountRequired: amountAtomic.toString(),
       resource,
       description: `Access to ${resource}`,
       mimeType: 'application/json',
@@ -300,6 +301,7 @@ export function localPaymentMiddleware(
         facilitatorUrl: '',
         payToAddress,
         tokenAddress: options?.tokenAddress || '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7',
+        tokenDecimals: 18,
         network: options?.network || 'starknet-sepolia',
         pricing,
         timeoutSeconds: options?.timeoutSeconds || 300,
@@ -326,6 +328,7 @@ export function localPaymentMiddleware(
         facilitatorUrl: '',
         payToAddress,
         tokenAddress: options?.tokenAddress || '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7',
+        tokenDecimals: 18,
         network: options?.network || 'starknet-sepolia',
         pricing,
         timeoutSeconds: options?.timeoutSeconds || 300,
