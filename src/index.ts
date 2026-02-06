@@ -17,6 +17,8 @@ const Env = z.object({
 
   PAY_TO_ADDRESS: z.string().min(10),
   TOKEN_ADDRESS: z.string().min(10),
+  // atomic decimals for TOKEN_ADDRESS (e.g. USDC=6)
+  TOKEN_DECIMALS: z.coerce.number().int().min(0).max(255).default(6),
   PRICE_CHAINSTATUS: z.string().default('$0.005'),
 });
 
@@ -67,6 +69,7 @@ async function main() {
     }, {
       facilitatorUrl: env.FACILITATOR_URL,
       tokenAddress: env.TOKEN_ADDRESS,
+      tokenDecimals: env.TOKEN_DECIMALS,
       network: env.NETWORK as any,
     } as any)
   );

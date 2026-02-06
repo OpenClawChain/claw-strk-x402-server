@@ -11,8 +11,9 @@ import {
   VerifyResponse,
   FacilitatorConfig,
   VerificationError,
+  NETWORKS,
 } from '../types/x402.js';
-import { hash, ec, CallData, Account, RpcProvider } from 'starknet';
+import { hash, ec, CallData, RpcProvider, typedData, shortString } from 'starknet';
 
 export class StarknetVerifier {
   private config: FacilitatorConfig;
@@ -157,41 +158,94 @@ export class StarknetVerifier {
    * Verifies a Starknet signature
    */
   private async verifySignature(payload: StarknetExactPayload): Promise<boolean> {
+    // Prefer account-contract signature validation (works for Argent/other account types).
+    // Falls back to pubkey+ec.verify for simple accounts.
     try {
-      // Compute the message hash
-      const messageHash = this.computePaymentHash(payload);
+      const messageHash = this.computeTypedPaymentMessageHash(payload);
 
-      // Get the public key from the account contract
-      const publicKey = await this.getAccountPublicKey(payload.from);
+      const res = await this.provider.callContract({
+        contractAddress: payload.from,
+        entrypoint: 'is_valid_signature',
+        calldata: [
+          messageHash,
+          '0x2',
+          payload.signature.r,
+          payload.signature.s,
+        ],
+      });
 
-      if (!publicKey) {
+      const v0 = res?.[0];
+      if (v0 && BigInt(v0) !== 0n) return true;
+      // If contract returns 0, treat invalid.
+      return false;
+    } catch (e) {
+      // Fallback: try to verify as a simple pubkey account.
+      try {
+        const messageHash = this.computeFallbackPaymentHash(payload);
+        const publicKey = await this.getAccountPublicKey(payload.from);
+        if (!publicKey) return false;
+
+        const signature = [payload.signature.r, payload.signature.s] as any;
+        return ec.starkCurve.verify(signature, messageHash, publicKey);
+      } catch (e2) {
+        console.error('Signature verification error:', e2);
         return false;
       }
-
-      // Verify the signature using Starknet's EC signature verification
-      const signature = [payload.signature.r, payload.signature.s] as any;
-
-      // Use starknet.js to verify the signature
-      const isValid = ec.starkCurve.verify(
-        signature,
-        messageHash,
-        publicKey
-      );
-
-      return isValid;
-    } catch (error) {
-      console.error('Signature verification error:', error);
-      return false;
     }
   }
 
+  private getChainIdHex(network: string): string {
+    const n = String(network).toLowerCase();
+    if (n.includes('main')) return '0x534e5f4d41494e'; // SN_MAIN
+    return '0x534e5f5345504f4c4941'; // SN_SEPOLIA
+  }
+
   /**
-   * Computes the hash of the payment data
+   * Computes the message hash of the payment data using the same TypedData schema as claw-strk.
    */
-  private computePaymentHash(payload: StarknetExactPayload): string {
-    // Create a structured hash of the payment data
-    // This follows the EIP-712 style but adapted for Starknet
-    
+  private computeTypedPaymentMessageHash(payload: StarknetExactPayload): string {
+    const domainName = shortString.encodeShortString('x402 Payment');
+    const domainVersion = shortString.encodeShortString('1');
+
+    const typed = {
+      types: {
+        StarkNetDomain: [
+          { name: 'name', type: 'felt' },
+          { name: 'version', type: 'felt' },
+          { name: 'chainId', type: 'felt' },
+        ],
+        Payment: [
+          { name: 'from', type: 'felt' },
+          { name: 'to', type: 'felt' },
+          { name: 'token', type: 'felt' },
+          { name: 'amount', type: 'felt' },
+          { name: 'nonce', type: 'felt' },
+          { name: 'deadline', type: 'felt' },
+        ],
+      },
+      primaryType: 'Payment',
+      domain: {
+        name: domainName,
+        version: domainVersion,
+        chainId: this.getChainIdHex((this.config as any).network ?? NETWORKS.STARKNET_SEPOLIA),
+      },
+      message: {
+        from: payload.from,
+        to: payload.to,
+        token: payload.token,
+        amount: payload.amount,
+        nonce: payload.nonce,
+        deadline: payload.deadline,
+      },
+    } as any;
+
+    return typedData.getMessageHash(typed, payload.from);
+  }
+
+  /**
+   * Legacy hash (kept only as a fallback).
+   */
+  private computeFallbackPaymentHash(payload: StarknetExactPayload): string {
     const data = [
       payload.from,
       payload.to,
@@ -200,10 +254,7 @@ export class StarknetVerifier {
       payload.nonce,
       payload.deadline.toString(),
     ];
-
-    // Use Pedersen hash (Starknet's native hash function)
-    const messageHash = hash.computeHashOnElements(data);
-    return messageHash;
+    return hash.computeHashOnElements(data);
   }
 
   /**
