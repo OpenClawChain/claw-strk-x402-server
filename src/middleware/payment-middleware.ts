@@ -18,7 +18,7 @@ import {
   X_PAYMENT_HEADER,
   X_PAYMENT_RESPONSE_HEADER,
   SCHEMES,
-} from '../types/x402';
+} from '../types/x402.js';
 
 /**
  * Creates payment middleware for Express applications

@@ -11,7 +11,7 @@ import {
   VerifyResponse,
   FacilitatorConfig,
   VerificationError,
-} from '../types/x402';
+} from '../types/x402.js';
 import { hash, ec, CallData, Account, RpcProvider } from 'starknet';
 
 export class StarknetVerifier {

@@ -21,9 +21,9 @@ import {
   NETWORKS,
   VerificationError,
   SettlementError,
-} from '../types/x402';
-import { StarknetVerifier } from './starknet-verifier';
-import { StarknetSettler } from './starknet-settler';
+} from '../types/x402.js';
+import { StarknetVerifier } from './starknet-verifier.js';
+import { StarknetSettler } from './starknet-settler.js';
 
 export class FacilitatorServer {
   private app: express.Application;

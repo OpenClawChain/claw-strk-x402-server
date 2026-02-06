@@ -11,7 +11,7 @@ import {
   SettleResponse,
   FacilitatorConfig,
   SettlementError,
-} from '../types/x402';
+} from '../types/x402.js';
 import { Account, CallData, RpcProvider, Contract, cairo } from 'starknet';
 
 export class StarknetSettler {
