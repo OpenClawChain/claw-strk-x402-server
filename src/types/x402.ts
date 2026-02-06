@@ -204,19 +204,25 @@ export interface SupportedResponse {
 export interface FacilitatorConfig {
   /** Port to run the server on */
   port: number;
-  
+
+  /** Starknet network identifier */
+  network: string;
+
   /** Starknet RPC URL */
   rpcUrl: string;
-  
+
+  /** Facilitator settlement account address */
+  accountAddress: string;
+
   /** Private key for facilitator account (for settlement) */
   privateKey: string;
-  
+
   /** Supported networks */
   networks: string[];
-  
+
   /** Supported schemes */
   schemes: string[];
-  
+
   /** Optional: Maximum gas price in wei */
   maxGasPrice?: string;
 }

@@ -12,7 +12,7 @@ import {
   FacilitatorConfig,
   SettlementError,
 } from '../types/x402.js';
-import { Account, CallData, RpcProvider, Contract, cairo } from 'starknet';
+import { Account, CallData, RpcProvider, Signer, uint256 } from 'starknet';
 
 export class StarknetSettler {
   private config: FacilitatorConfig;
@@ -30,25 +30,22 @@ export class StarknetSettler {
    */
   private async initializeAccount(): Promise<void> {
     try {
-      if (!this.config.privateKey) {
-        console.warn('No private key provided, settlement will not be available');
+      if (!this.config.privateKey || !this.config.accountAddress) {
+        console.warn('Missing facilitator accountAddress/privateKey; settlement will not be available');
         return;
       }
 
-      // Create account instance
-      // Note: In production, you'd derive the account address from the private key
-      // For now, this is a simplified version
-      
-      // The account address should be provided in config or derived
-      // this.account = new Account(
-      //   this.provider,
-      //   accountAddress,
-      //   this.config.privateKey
-      // );
-      
+      const signer = new Signer(this.config.privateKey);
+      this.account = new Account({
+        provider: this.provider,
+        address: this.config.accountAddress,
+        signer,
+      });
+
       console.log('Facilitator account initialized');
     } catch (error) {
       console.error('Failed to initialize facilitator account:', error);
+      this.account = null;
     }
   }
 
@@ -68,7 +65,7 @@ export class StarknetSettler {
       const txHash = await this.executePayment(payload);
 
       // Wait for transaction confirmation
-      await this.waitForTransaction(txHash);
+      await this.provider.waitForTransaction(txHash);
 
       return {
         success: true,
@@ -91,47 +88,26 @@ export class StarknetSettler {
    * Executes the payment by calling the PaymentProcessor contract
    */
   private async executePayment(payload: StarknetExactPayload): Promise<string> {
-    if (!this.account) {
-      throw new SettlementError('Account not initialized');
-    }
+    if (!this.account) throw new SettlementError('Account not initialized');
 
-    // In production, you would:
-    // 1. Load the PaymentProcessor contract ABI
-    // 2. Call the execute_payment function with the payload data
-    // 3. Return the transaction hash
+    // Settle by pulling funds from payer using ERC20 transfer_from.
+    // Requires the payer to have approved the facilitator account as spender.
+    const call = {
+      contractAddress: payload.token,
+      entrypoint: 'transfer_from',
+      calldata: CallData.compile({
+        sender: payload.from,
+        recipient: payload.to,
+        amount: uint256.bnToUint256(BigInt(payload.amount)),
+      }),
+    } as any;
 
-    // Example call structure:
-    /*
-    const paymentProcessorContract = new Contract(
-      PAYMENT_PROCESSOR_ABI,
-      PAYMENT_PROCESSOR_ADDRESS,
-      this.provider
-    );
+    const res: any = await this.account.execute(call);
+    const txHash = res.transaction_hash ?? res.transactionHash;
+    if (!txHash) throw new Error(`No tx hash returned from account.execute: ${JSON.stringify(res)}`);
 
-    paymentProcessorContract.connect(this.account);
-
-    const call = paymentProcessorContract.populate('execute_payment', {
-      from: payload.from,
-      to: payload.to,
-      token: payload.token,
-      amount: cairo.uint256(payload.amount),
-      nonce: cairo.uint256(payload.nonce),
-      deadline: payload.deadline,
-      signature_r: payload.signature.r,
-      signature_s: payload.signature.s,
-    });
-
-    const { transaction_hash } = await this.account.execute(call);
-    return transaction_hash;
-    */
-
-    // Simplified mock for now
-    const mockTxHash = '0x' + Array.from({ length: 64 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
-
-    console.log(`Settlement transaction submitted: ${mockTxHash}`);
-    return mockTxHash;
+    console.log(`Settlement transaction submitted: ${txHash}`);
+    return txHash;
   }
 
   /**
